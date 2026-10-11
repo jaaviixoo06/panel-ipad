@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Dashboard iPad">
@@ -42,8 +43,8 @@
     }
 
     html, body {
-      width: 100vw;
-      height: 100vh;
+      width: 100%;
+      height: 100%;
       overflow: hidden;
       background-color: var(--bg);
       color: var(--text-main);
@@ -53,9 +54,9 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Soporte para áreas seguras de iPadOS (Notch / Home bar) */
+    /* Soporte para áreas seguras de iPadOS (Notch / Home bar) con margen mínimo */
     body {
-      padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 16px) env(safe-area-inset-left, 20px);
+      padding: max(16px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
       display: flex;
       flex-direction: column;
     }
@@ -69,14 +70,6 @@
       grid-template-columns: 1fr 1fr;
       grid-gap: 20px;
       min-height: 0; /* Crucial para flex y grid internos */
-    }
-
-    @media (orientation: portrait), (max-width: 820px) {
-      #app-container {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
-        overflow-y: auto;
-      }
     }
 
     .column {
@@ -419,7 +412,7 @@
       justify-content: space-between;
       align-items: center;
       margin-top: 14px;
-      padding: 4px 8px 0 8px;
+      padding: 4px 110px 0 8px; /* hueco a la derecha para que la rana no tape "Ajustes" */
       font-size: 0.88rem;
       color: var(--text-muted);
       position: relative;
@@ -636,6 +629,50 @@
       background: rgba(244, 63, 94, 0.15);
       color: var(--accent-rose);
       border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+
+    /* ==========================================================================
+       ADAPTACIÓN POR DISPOSITIVO
+       ========================================================================== */
+
+    /* Tablet en vertical y pantallas estrechas: una columna y scroll de página */
+    @media (orientation: portrait), (max-width: 820px) {
+      html, body { height: auto; min-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+      #app-container { grid-template-columns: 1fr; grid-template-rows: auto; overflow: visible; }
+      .column { height: auto; }
+      .agenda-card, .emails-card { flex: none; }
+      .scroll-container { overflow: visible; padding-right: 0; }
+      .agenda-group-title { position: static; }
+      #dashboard-footer { padding-bottom: 90px; } /* hueco para la rana */
+    }
+
+    /* Móvil: todo más compacto */
+    @media (max-width: 520px) {
+      body { padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)); }
+      #app-container { grid-gap: 12px; }
+      .card { padding: 14px; border-radius: 16px; }
+      .clock-card { padding: 16px 18px; }
+      .clock-time { font-size: 3.6rem; }
+      .clock-seconds { font-size: 1.2rem; }
+      .event-header-row { flex-direction: column; align-items: flex-start; gap: 4px; }
+      .event-title { white-space: normal; font-size: 1.05rem; }
+      .frog-dock { right: 10px; bottom: 8px; }
+      #frog-canvas { width: 56px; height: 56px; }
+      .modal-actions { flex-direction: column-reverse; }
+      .modal-actions .btn { width: 100%; }
+    }
+
+    /* Móvil en horizontal: poca altura, reloj reducido */
+    @media (orientation: landscape) and (max-height: 500px) {
+      .card { padding: 12px; }
+      .clock-card { padding: 10px 18px; }
+      .clock-time { font-size: 3rem; }
+      .clock-date { font-size: 1rem; margin-top: 4px; }
+    }
+
+    /* Monitores grandes o tele: todo escala hacia arriba */
+    @media (min-width: 1700px) {
+      html { font-size: 20px; }
     }
   </style>
 </head>
@@ -1244,11 +1281,12 @@
           }
 
           // Éxito: Pintamos los datos
-          latestDashboardData = data;
           frog.setConnected(true);
 
           renderEvents(data.eventos || []);
           renderEmails(data.correos || {});
+          // Se asigna después de pintar: así la primera carga no cuenta como "correo nuevo"
+          latestDashboardData = data;
 
           const updatedTime = data.actualizado ? new Date(data.actualizado) : new Date();
           updateStatusSuccess(updatedTime);
@@ -1257,9 +1295,9 @@
           console.warn("Fallo de sincronización:", err.message);
           frog.setConnected(false); // La rana pone cara de confusión
 
-          // Mantener los últimos datos buenos en pantalla y mostrar aviso discreto
-          const lastTimeStr = latestDashboardData ? " (Manteniendo datos previos)" : "";
-          updateStatusWarning("Aviso: Red inestable" + lastTimeStr);
+          // Mantener los últimos datos buenos en pantalla y mostrar el motivo real
+          const lastTimeStr = latestDashboardData ? " (manteniendo datos previos)" : "";
+          updateStatusWarning("Error: " + err.message + lastTimeStr);
         } finally {
           isFetching = false;
         }
@@ -1292,7 +1330,6 @@
 
         let state = "IDLE"; // IDLE, SLEEP, JUMP, CONFUSED, ALERT
         let isConnected = true;
-        let alertMessage = "";
         let jumpProgress = 0;
         let breathFrame = 0;
         let isBlinking = false;
@@ -1303,8 +1340,6 @@
           return hour >= SLEEP_START_HOUR || hour < SLEEP_END_HOUR;
         }
 
-        // Matriz de Pixel Art (24x24) para la Rana
-        // 0: Vacío, 1: Borde, 2: Verde Base, 3: Verde Sombra, 4: Blanco Ojo, 5: Pupila, 6: Rosa Colorete, 7: Verde Claro
         function drawPixelGrid(grid) {
           ctx.clearRect(0, 0, 24, 24);
           for (let y = 0; y < 24; y++) {
@@ -1329,8 +1364,6 @@
           const jumpY = (state === "JUMP") ? -Math.round(Math.sin(jumpProgress * Math.PI) * 5) : 0;
           const yOff = offsetY + jumpY + 4; // Centrado hacia abajo
 
-          // Cuerpo redondeado de la rana
-          // Filas 7 a 17 (relativo a yOff)
           function fillRect(x1, y1, w, h, col) {
             for (let yy = y1; yy < y1 + h; yy++) {
               for (let xx = x1; xx < x1 + w; xx++) {
@@ -1370,11 +1403,11 @@
             fillRect(20, 2 + zY, 1, 1, "Z");
             fillRect(19, 3 + zY, 2, 1, "Z");
           } else if (state === "CONFUSED" || !isConnected) {
-            // Ojos en espiral / confundidos (x o desconcertados)
+            // Ojos confundidos
             fillRect(6, 4, 3, 3, "W");
             fillRect(15, 4, 3, 3, "W");
-            fillRect(7, 5, 1, 1, "Y"); // Ojo interrogante
-            fillRect(16, 4, 2, 1, "K"); // Ceja fruncida
+            fillRect(7, 5, 1, 1, "Y");
+            fillRect(16, 4, 2, 1, "K");
             fillRect(16, 6, 1, 1, "P");
             // Signo de interrogación encima
             fillRect(11, 0, 3, 1, "Y");
@@ -1401,15 +1434,12 @@
 
           // Boca
           if (state === "JUMP") {
-            // Boca abierta croando en salto
             fillRect(10, 11, 4, 3, "R");
             fillRect(11, 12, 2, 1, "K");
           } else if (state === "CONFUSED" || !isConnected) {
-            // Boca ondulada / duda
             fillRect(10, 12, 2, 1, "K");
             fillRect(12, 11, 2, 1, "K");
           } else {
-            // Sonrisa calmada
             fillRect(9, 12, 6, 1, "K");
           }
 
@@ -1437,10 +1467,10 @@
           bubble.classList.remove("visible");
         }
 
-        // Loop de animación a 30 FPS suficiente y ligero para iPad 2019
+        // Loop de animación ligero (~15 FPS), suficiente para pixel art en un iPad de 2019
         let lastFrameTime = 0;
         function animateLoop(timestamp) {
-          if (timestamp - lastFrameTime > 66) { // ~15-20 FPS es ideal para pixel art nostálgico y ahorra batería
+          if (timestamp - lastFrameTime > 66) {
             lastFrameTime = timestamp;
 
             breathFrame += 0.08;
@@ -1510,6 +1540,12 @@
       } else {
         fetchDashboardData();
       }
+
+    })();
+  </script>
+</body>
+</html>
+
 
     })();
   </script>
