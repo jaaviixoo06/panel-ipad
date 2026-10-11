@@ -67,7 +67,7 @@
     #app-container {
       flex: 1;
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); /* minmax(0,...) evita que un texto largo ensanche la columna */
       grid-gap: 20px;
       min-height: 0; /* Crucial para flex y grid internos */
     }
@@ -77,6 +77,7 @@
       flex-direction: column;
       gap: 16px;
       min-height: 0;
+      min-width: 0;
       height: 100%;
     }
 
@@ -635,10 +636,13 @@
        ADAPTACIÓN POR DISPOSITIVO
        ========================================================================== */
 
+    /* Permite que los textos largos se recorten con "..." en vez de ensanchar su caja */
+    .event-title, .email-sender, .email-item, .event-item { min-width: 0; }
+
     /* Tablet en vertical y pantallas estrechas: una columna y scroll de página */
     @media (orientation: portrait), (max-width: 820px) {
       html, body { height: auto; min-height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-      #app-container { grid-template-columns: 1fr; grid-template-rows: auto; overflow: visible; }
+      #app-container { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; overflow: visible; }
       .column { height: auto; }
       .agenda-card, .emails-card { flex: none; }
       .scroll-container { overflow: visible; padding-right: 0; }
