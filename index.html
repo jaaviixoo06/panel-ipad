@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dashboard iPad">
+  <meta name="theme-color" content="#0d1117">
+  <title>Dashboard Personal iPad</title>
+  <style>
+    /* ==========================================================================
+       VARIABLES Y PALETA DE COLOR (ALTO CONTRASTE, TEMA OSCURO OLED / NOCTURNO)
+       ========================================================================== */
+    :root {
+      --bg: #090d16;
+      --surface: #131b2a;
+      --surface-elevated: #1a253a;
+      --surface-border: #24324d;
+      --text-main: #f0f6fc;
+      --text-muted: #8b9bb4;
+      --text-dim: #4f5f77;
+      
+      --accent-green: #2ecc71;
+      --accent-emerald: #10b981;
+      --accent-blue: #38bdf8;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      
+      --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: "SF Mono", Menlo, Consolas, Monaco, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg);
+      color: var(--text-main);
+      font-family: var(--font-system);
+      font-size: 16px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Soporte para áreas seguras de iPadOS (Notch / Home bar) */
+    body {
+      padding: env(safe-area-inset-top, 16px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 16px) env(safe-area-inset-left, 20px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ==========================================================================
+       ESTRUCTURA GENERAL DEL DASHBOARD (SIN SCROLL GLOBAL, 2 COLUMNAS EN HORIZONTAL)
+       ========================================================================== */
+    #app-container {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-gap: 20px;
+      min-height: 0; /* Crucial para flex y grid internos */
+    }
+
+    @media (orientation: portrait), (max-width: 820px) {
+      #app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        overflow-y: auto;
+      }
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-height: 0;
+      height: 100%;
+    }
+
+    /* Paneles de superficie */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--surface-border);
+      border-radius: 20px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* ==========================================================================
+       COLUMNA IZQUIERDA: RELOJ ENORME + AGENDA (HOY / MAÑANA)
+       ========================================================================== */
+    .clock-card {
+      padding: 24px 28px;
+      background: linear-gradient(145deg, #162032 0%, #101726 100%);
+      border: 1px solid #283754;
+      flex-shrink: 0;
+    }
+
+    .clock-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .clock-time {
+      font-size: clamp(4.5rem, 8vw, 6.5rem);
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 0.95;
+      color: #ffffff;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    .clock-seconds {
+      font-size: 1.8rem;
+      font-weight: 500;
+      color: var(--accent-emerald);
+      margin-left: 8px;
+    }
+
+    .clock-date {
+      font-size: clamp(1.2rem, 2vw, 1.6rem);
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-top: 10px;
+      text-transform: capitalize;
+      letter-spacing: -0.3px;
+    }
+
+    /* Agenda y lista de eventos */
+    .agenda-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title-icon {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+    }
+
+    .scroll-container {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 6px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Barra de scroll discreta */
+    .scroll-container::-webkit-scrollbar {
+      width: 5px;
+    }
+    .scroll-container::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.02);
+      border-radius: 4px;
+    }
+    .scroll-container::-webkit-scrollbar-thumb {
+      background: var(--surface-border);
+      border-radius: 4px;
+    }
+
+    .agenda-group-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin: 12px 0 8px 0;
+      position: sticky;
+      top: 0;
+      background: var(--surface);
+      padding: 4px 0;
+      z-index: 2;
+    }
+    .agenda-group-title:first-child {
+      margin-top: 0;
+    }
+
+    .event-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .event-item {
+      display: flex;
+      align-items: stretch;
+      background: var(--surface-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 14px;
+      overflow: hidden;
+      transition: background 0.2s ease;
+    }
+
+    .event-color-strip {
+      width: 8px;
+      flex-shrink: 0;
+    }
+
+    .event-body {
+      padding: 12px 14px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .event-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .event-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .event-time-badge {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--accent-emerald);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+      background: rgba(46, 204, 113, 0.12);
+      padding: 2px 8px;
+      border-radius: 6px;
+    }
+
+    .event-meta {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .event-cal-name {
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.5px;
+      opacity: 0.8;
+    }
+
+    .event-location {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--accent-amber);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ==========================================================================
+       COLUMNA DERECHA: CORREOS (TAREAS, PROFESORES, IMPORTANTES)
+       ========================================================================== */
+    .emails-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .email-section {
+      margin-bottom: 16px;
+    }
+
+    .email-section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .email-section-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .email-tag-count {
+      background: var(--surface-border);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 10px;
+    }
+
+    .email-tag-count.has-unread {
+      background: var(--accent-rose);
+      color: #fff;
+    }
+
+    .email-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .email-item {
+      background: var(--surface-elevated);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 12px;
+      padding: 10px 14px;
+      position: relative;
+    }
+
+    .email-item.unread {
+      border-left: 4px solid var(--accent-blue);
+      background: linear-gradient(90deg, rgba(56, 189, 248, 0.08) 0%, var(--surface-elevated) 100%);
+    }
+
+    .email-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+
+    .email-sender {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .email-date {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .email-subject {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+
+    .email-item.unread .email-subject {
+      color: var(--accent-blue);
+    }
+
+    .email-snippet {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      opacity: 0.85;
+    }
+
+    .empty-state {
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, 0.015);
+      border: 1px dashed var(--surface-border);
+      border-radius: 10px;
+      color: var(--text-dim);
+      font-size: 0.9rem;
+      font-style: italic;
+      text-align: center;
+    }
+
+    /* ==========================================================================
+       PIE DE PÁGINA (ESTADO, HORA DE ACTUALIZACIÓN, AJUSTES, MASCOTA)
+       ========================================================================== */
+    #dashboard-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      padding: 4px 8px 0 8px;
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      position: relative;
+    }
+
+    .footer-status-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+    }
+
+    .pulse-dot.error {
+      background-color: var(--accent-rose);
+      box-shadow: 0 0 6px var(--accent-rose);
+      animation: blink 1.2s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .btn-settings {
+      background: transparent;
+      border: 1px solid var(--surface-border);
+      color: var(--text-muted);
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+
+    .btn-settings:active {
+      background: var(--surface-elevated);
+      color: var(--text-main);
+    }
+
+    /* ==========================================================================
+       MASCOTA: RANA PIXEL ART REACTIVA (CANVAS NÍTIDO 2D + BOCADILLO)
+       ========================================================================== */
+    .frog-dock {
+      position: fixed;
+      bottom: 12px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    #frog-speech-bubble {
+      background: #ffffff;
+      color: #0c121e;
+      font-size: 0.82rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      max-width: 220px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      position: relative;
+      opacity: 0;
+      transform: translateY(6px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      white-space: normal;
+      line-height: 1.2;
+    }
+
+    #frog-speech-bubble.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #frog-speech-bubble::after {
+      content: "";
+      position: absolute;
+      bottom: -6px;
+      right: 20px;
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 6px solid #ffffff;
+    }
+
+    #frog-canvas {
+      width: 72px;
+      height: 72px;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: -webkit-crisp-edges;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+      transform-origin: bottom center;
+    }
+
+    /* ==========================================================================
+       MODAL DE CONFIGURACIÓN (API Y TOKEN)
+       ========================================================================== */
+    #config-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 14, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+
+    #config-modal.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .config-card {
+      background: #151e2e;
+      border: 1px solid #293854;
+      border-radius: 20px;
+      padding: 28px;
+      width: 90%;
+      max-width: 480px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+
+    .config-card h2 {
+      font-size: 1.4rem;
+      margin-bottom: 8px;
+      color: #fff;
+    }
+
+    .config-card p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .form-group input {
+      width: 100%;
+      background: #0b1019;
+      border: 1px solid #283754;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-family: var(--font-mono);
+      outline: none;
+      user-select: auto;
+      -webkit-user-select: auto;
+    }
+
+    .form-group input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: var(--accent-emerald);
+      color: #062b16;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--surface-border);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: var(--accent-rose);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- CONTENEDOR PRINCIPAL DEL DASHBOARD -->
+  <main id="app-container">
+    
+    <!-- COLUMNA IZQUIERDA: HORA Y AGENDA -->
+    <section class="column">
+      <!-- Tarjeta del Reloj de alto impacto -->
+      <article class="card clock-card">
+        <div class="clock-header">
+          <div style="display: flex; align-items: baseline;">
+            <div id="clock-display" class="clock-time">--:--</div>
+            <div id="clock-seconds" class="clock-seconds">00</div>
+          </div>
+        </div>
+        <div id="date-display" class="clock-date">Cargando fecha...</div>
+      </article>
+
+      <!-- Tarjeta de Agenda agrupada -->
+      <article class="card agenda-card">
+        <h2 class="card-title">
+          <span class="card-title-icon"></span>
+          Agenda de Eventos
+        </h2>
+        <div class="scroll-container" id="agenda-scroll-container">
+          <!-- Grupo Hoy -->
+          <div class="agenda-group-title">Hoy</div>
+          <div class="event-list" id="events-today">
+            <div class="empty-state">No hay eventos pendientes para hoy</div>
+          </div>
+
+          <!-- Grupo Mañana -->
+          <div class="agenda-group-title" style="margin-top: 16px;">Mañana</div>
+          <div class="event-list" id="events-tomorrow">
+            <div class="empty-state">No hay eventos programados para mañana</div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <!-- COLUMNA DERECHA: BANDEJA DE CORREOS -->
+    <section class="column">
+      <article class="card emails-card">
+        <h2 class="card-title">
+          <span class="card-title-icon" style="background: var(--accent-blue); box-shadow: 0 0 10px var(--accent-blue);"></span>
+          Comunicaciones & Correos
+        </h2>
+        <div class="scroll-container" id="emails-scroll-container">
+          
+          <!-- Sección: Tareas -->
+          <div class="email-section">
+            <div class="email-section-header">
+              <span class="email-section-title">Tareas</span>
+              <span class="email-tag-count" id="count-tareas">0</span>
+            </div>
+            <div class="email-list" id="list-tareas">
+              <div class="empty-state">Sin tareas pendientes</div>
+            </div>
+          </div>
+
+          <!-- Sección: Profesores -->
+          <div class="email-section">
+            <div class="email-section-header">
+              <span class="email-section-title">Profesores</span>
+              <span class="email-tag-count" id="count-profesores">0</span>
+            </div>
+            <div class="email-list" id="list-profesores">
+              <div class="empty-state">Sin mensajes de profesores</div>
+            </div>
+          </div>
+
+          <!-- Sección: Importantes -->
+          <div class="email-section">
+            <div class="email-section-header">
+              <span class="email-section-title">Importantes</span>
+              <span class="email-tag-count" id="count-importantes">0</span>
+            </div>
+            <div class="email-list" id="list-importantes">
+              <div class="empty-state">Sin correos importantes</div>
+            </div>
+          </div>
+
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <!-- BARRA INFERIOR / FOOTER -->
+  <footer id="dashboard-footer">
+    <div class="footer-status-box">
+      <div id="status-indicator" class="pulse-dot"></div>
+      <span id="last-updated-text">Iniciando conexión...</span>
+    </div>
+    <div>
+      <button class="btn-settings" id="btn-open-settings">Ajustes</button>
+    </div>
+  </footer>
+
+  <!-- DOCK DE LA MASCOTA (RANA PIXEL ART) -->
+  <div class="frog-dock">
+    <div id="frog-speech-bubble">¡Hola!</div>
+    <canvas id="frog-canvas" width="24" height="24"></canvas>
+  </div>
+
+  <!-- MODAL DE CONFIGURACIÓN (API Y TOKEN) -->
+  <div id="config-modal">
+    <div class="config-card">
+      <h2>Configuración</h2>
+      <p>Introduce la URL de tu Google Apps Script y el Token de acceso.</p>
+      <form id="config-form">
+        <div class="form-group">
+          <label for="input-api">API Endpoint URL</label>
+          <input type="url" id="input-api" placeholder="https://script.google.com/macros/s/.../exec" required>
+        </div>
+        <div class="form-group">
+          <label for="input-token">Token</label>
+          <input type="password" id="input-token" placeholder="Tu token secreto" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-danger" id="btn-clear-settings">Borrar credenciales</button>
+          <button type="button" class="btn btn-secondary" id="btn-cancel-settings">Cerrar</button>
+          <button type="submit" class="btn btn-primary">Guardar y Sincronizar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==========================================================================
+       JAVASCRIPT AUTÓNOMO (SIN DEPENDENCIAS, OPTIMIZADO PARA SAFARI IPADOS 15+)
+       ========================================================================== -->
+  <script>
+    (function () {
+      "use strict";
+
+      /* ==========================================================================
+         1. CONSTANTES CONFIGURABLES
+         ========================================================================== */
+      const REFRESH_INTERVAL_MINUTES = 5;       // Frecuencia de sincronización
+      const SLEEP_START_HOUR = 23;              // 23:00 - Comienza a dormir la rana
+      const SLEEP_END_HOUR = 7;                 // 07:00 - Se despierta la rana
+      const EVENT_ALERT_WINDOW_MINUTES = 15;     // Aviso de evento inminente (bocadillo)
+      
+      const STORAGE_KEY_API = "ipad_dashboard_api_url";
+      const STORAGE_KEY_TOKEN = "ipad_dashboard_api_token";
+
+      /* Estado en memoria */
+      let latestDashboardData = null;
+      let previousUnreadEmailsCount = 0;
+      let isFetching = false;
+      let upcomingEventAlertShown = null;
+
+      /* ==========================================================================
+         2. ELEMENTOS DEL DOM
+         ========================================================================== */
+      const dom = {
+        clock: document.getElementById("clock-display"),
+        seconds: document.getElementById("clock-seconds"),
+        date: document.getElementById("date-display"),
+        statusDot: document.getElementById("status-indicator"),
+        lastUpdatedText: document.getElementById("last-updated-text"),
+        eventsToday: document.getElementById("events-today"),
+        eventsTomorrow: document.getElementById("events-tomorrow"),
+        listTareas: document.getElementById("list-tareas"),
+        listProfesores: document.getElementById("list-profesores"),
+        listImportantes: document.getElementById("list-importantes"),
+        countTareas: document.getElementById("count-tareas"),
+        countProfesores: document.getElementById("count-profesores"),
+        countImportantes: document.getElementById("count-importantes"),
+        frogCanvas: document.getElementById("frog-canvas"),
+        speechBubble: document.getElementById("frog-speech-bubble"),
+        modal: document.getElementById("config-modal"),
+        form: document.getElementById("config-form"),
+        inputApi: document.getElementById("input-api"),
+        inputToken: document.getElementById("input-token"),
+        btnOpenSettings: document.getElementById("btn-open-settings"),
+        btnCancelSettings: document.getElementById("btn-cancel-settings"),
+        btnClearSettings: document.getElementById("btn-clear-settings")
+      };
+
+      /* ==========================================================================
+         3. GESTIÓN DE CONFIGURACIÓN (LOCALSTORAGE CON TRY/CATCH)
+         ========================================================================== */
+      function getStoredCredentials() {
+        try {
+          const api = localStorage.getItem(STORAGE_KEY_API) || "";
+          const token = localStorage.getItem(STORAGE_KEY_TOKEN) || "";
+          return { api: api.trim(), token: token.trim() };
+        } catch (e) {
+          console.error("Error al acceder a localStorage:", e);
+          return { api: "", token: "" };
+        }
+      }
+
+      function saveStoredCredentials(api, token) {
+        try {
+          localStorage.setItem(STORAGE_KEY_API, api.trim());
+          localStorage.setItem(STORAGE_KEY_TOKEN, token.trim());
+          return true;
+        } catch (e) {
+          console.error("Error al guardar en localStorage:", e);
+          return false;
+        }
+      }
+
+      function clearStoredCredentials() {
+        try {
+          localStorage.removeItem(STORAGE_KEY_API);
+          localStorage.removeItem(STORAGE_KEY_TOKEN);
+          return true;
+        } catch (e) {
+          console.error("Error al limpiar localStorage:", e);
+          return false;
+        }
+      }
+
+      function showConfigModal() {
+        const creds = getStoredCredentials();
+        dom.inputApi.value = creds.api;
+        dom.inputToken.value = creds.token;
+        dom.modal.classList.add("show");
+      }
+
+      function hideConfigModal() {
+        dom.modal.classList.remove("show");
+      }
+
+      dom.btnOpenSettings.addEventListener("click", showConfigModal);
+      dom.btnCancelSettings.addEventListener("click", hideConfigModal);
+
+      dom.btnClearSettings.addEventListener("click", function () {
+        if (confirm("¿Deseas borrar las credenciales guardadas?")) {
+          clearStoredCredentials();
+          dom.inputApi.value = "";
+          dom.inputToken.value = "";
+          hideConfigModal();
+          updateStatusWarning("Sin credenciales configuradas");
+          showConfigModal();
+        }
+      });
+
+      dom.form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        const api = dom.inputApi.value;
+        const token = dom.inputToken.value;
+        if (saveStoredCredentials(api, token)) {
+          hideConfigModal();
+          fetchDashboardData();
+        }
+      });
+
+      /* ==========================================================================
+         4. RELOJ Y FECHA EN TIEMPO REAL
+         ========================================================================== */
+      const MONTH_NAMES = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"
+      ];
+      const DAY_NAMES = [
+        "domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"
+      ];
+
+      function pad2(num) {
+        return num < 10 ? "0" + num : "" + num;
+      }
+
+      function updateClock() {
+        const now = new Date();
+        const hours = pad2(now.getHours());
+        const minutes = pad2(now.getMinutes());
+        const seconds = pad2(now.getSeconds());
+
+        dom.clock.textContent = hours + ":" + minutes;
+        dom.seconds.textContent = seconds;
+
+        const dayName = DAY_NAMES[now.getDay()];
+        const dayNumber = now.getDate();
+        const monthName = MONTH_NAMES[now.getMonth()];
+        const year = now.getFullYear();
+
+        // Formato: Lunes, 12 de octubre de 2026
+        dom.date.textContent = dayName + ", " + dayNumber + " de " + monthName + " de " + year;
+      }
+      setInterval(updateClock, 1000);
+      updateClock();
+
+      /* ==========================================================================
+         5. FORMATEO DE HORAS Y FECHAS (EVENTOS Y CORREOS)
+         ========================================================================== */
+      function isSameDate(d1, d2) {
+        return (
+          d1.getFullYear() === d2.getFullYear() &&
+          d1.getMonth() === d2.getMonth() &&
+          d1.getDate() === d2.getDate()
+        );
+      }
+
+      function formatTimeOnly(date) {
+        return pad2(date.getHours()) + ":" + pad2(date.getMinutes());
+      }
+
+      function formatRelativeEmailDate(dateStr) {
+        if (!dateStr) return "";
+        const emailDate = new Date(dateStr);
+        if (isNaN(emailDate.getTime())) return "";
+
+        const now = new Date();
+        if (isSameDate(emailDate, now)) {
+          return formatTimeOnly(emailDate);
+        }
+
+        const yesterday = new Date(now);
+        yesterday.setDate(yesterday.getDate() - 1);
+        if (isSameDate(emailDate, yesterday)) {
+          return "Ayer";
+        }
+
+        const shortMonths = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+        return emailDate.getDate() + " " + shortMonths[emailDate.getMonth()];
+      }
+
+      /* ==========================================================================
+         6. RENDERIZADO SEGURO DE DATOS (ESTRICTO USO DE textContent)
+         ========================================================================== */
+      function renderEvents(eventos) {
+        const now = new Date();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        // Limpiar listas de forma segura
+        while (dom.eventsToday.firstChild) dom.eventsToday.removeChild(dom.eventsToday.firstChild);
+        while (dom.eventsTomorrow.firstChild) dom.eventsTomorrow.removeChild(dom.eventsTomorrow.firstChild);
+
+        if (!Array.isArray(eventos)) return;
+
+        const listToday = [];
+        const listTomorrow = [];
+
+        eventos.forEach(function (ev) {
+          const startDate = new Date(ev.inicio);
+          const endDate = new Date(ev.fin);
+
+          // Si el evento ya terminó antes de ahora mismo, se oculta
+          if (endDate < now) return;
+
+          // Si empezó antes de hoy pero aún no termina, cuenta como de Hoy
+          const isStartedBeforeToday = startDate < new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          const isToday = isStartedBeforeToday || isSameDate(startDate, now);
+          const isTomorrow = !isToday && isSameDate(startDate, tomorrow);
+
+          if (isToday) {
+            listToday.push({ ...ev, _start: startDate, _end: endDate });
+          } else if (isTomorrow) {
+            listTomorrow.push({ ...ev, _start: startDate, _end: endDate });
+          }
+        });
+
+        // Ordenar por hora de inicio (eventos de todo el día primero)
+        function sortEvents(a, b) {
+          if (a.todoElDia && !b.todoElDia) return -1;
+          if (!a.todoElDia && b.todoElDia) return 1;
+          return a._start - b._start;
+        }
+
+        listToday.sort(sortEvents);
+        listTomorrow.sort(sortEvents);
+
+        function createEventNode(ev) {
+          const item = document.createElement("div");
+          item.className = "event-item";
+
+          // Franja de color del calendario
+          const strip = document.createElement("div");
+          strip.className = "event-color-strip";
+          strip.style.backgroundColor = ev.color || "var(--accent-emerald)";
+          item.appendChild(strip);
+
+          const body = document.createElement("div");
+          body.className = "event-body";
+
+          const headerRow = document.createElement("div");
+          headerRow.className = "event-header-row";
+
+          const titleEl = document.createElement("div");
+          titleEl.className = "event-title";
+          titleEl.textContent = ev.titulo || "Sin título";
+          headerRow.appendChild(titleEl);
+
+          const badgeEl = document.createElement("div");
+          badgeEl.className = "event-time-badge";
+          if (ev.todoElDia) {
+            badgeEl.textContent = "Todo el día";
+          } else {
+            badgeEl.textContent = formatTimeOnly(ev._start) + " - " + formatTimeOnly(ev._end);
+          }
+          headerRow.appendChild(badgeEl);
+          body.appendChild(headerRow);
+
+          // Fila de metadatos (Calendario y Lugar si existe)
+          const metaRow = document.createElement("div");
+          metaRow.className = "event-meta";
+
+          if (ev.calendario) {
+            const calSpan = document.createElement("span");
+            calSpan.className = "event-cal-name";
+            calSpan.textContent = ev.calendario;
+            metaRow.appendChild(calSpan);
+          }
+
+          if (ev.lugar && ev.lugar.trim() !== "") {
+            const locSpan = document.createElement("span");
+            locSpan.className = "event-location";
+            locSpan.textContent = "📍 " + ev.lugar.trim();
+            metaRow.appendChild(locSpan);
+          }
+
+          if (metaRow.childNodes.length > 0) {
+            body.appendChild(metaRow);
+          }
+
+          item.appendChild(body);
+          return item;
+        }
+
+        // Inserción en Hoy
+        if (listToday.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No hay eventos pendientes para hoy";
+          dom.eventsToday.appendChild(empty);
+        } else {
+          listToday.forEach(function (ev) {
+            dom.eventsToday.appendChild(createEventNode(ev));
+          });
+        }
+
+        // Inserción en Mañana
+        if (listTomorrow.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "No hay eventos programados para mañana";
+          dom.eventsTomorrow.appendChild(empty);
+        } else {
+          listTomorrow.forEach(function (ev) {
+            dom.eventsTomorrow.appendChild(createEventNode(ev));
+          });
+        }
+
+        // Comprobar eventos inminentes para que la rana avise (< 15 min)
+        checkUpcomingEvent(listToday);
+      }
+
+      function renderEmailSection(container, countBadge, items) {
+        while (container.firstChild) container.removeChild(container.firstChild);
+
+        const list = Array.isArray(items) ? items : [];
+        let unreadCount = 0;
+
+        if (list.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.textContent = "Sin correos en esta sección";
+          container.appendChild(empty);
+          countBadge.textContent = "0";
+          countBadge.classList.remove("has-unread");
+          return 0;
+        }
+
+        list.forEach(function (mail) {
+          if (mail.noLeido) unreadCount++;
+
+          const item = document.createElement("div");
+          item.className = "email-item" + (mail.noLeido ? " unread" : "");
+
+          const topRow = document.createElement("div");
+          topRow.className = "email-top-row";
+
+          const sender = document.createElement("div");
+          sender.className = "email-sender";
+          sender.textContent = mail.de || "Remitente desconocido";
+          topRow.appendChild(sender);
+
+          const dateEl = document.createElement("div");
+          dateEl.className = "email-date";
+          dateEl.textContent = formatRelativeEmailDate(mail.fecha);
+          topRow.appendChild(dateEl);
+
+          item.appendChild(topRow);
+
+          const subjEl = document.createElement("div");
+          subjEl.className = "email-subject";
+          subjEl.textContent = mail.asunto || "(Sin asunto)";
+          item.appendChild(subjEl);
+
+          if (mail.resumen && mail.resumen.trim() !== "") {
+            const snipEl = document.createElement("div");
+            snipEl.className = "email-snippet";
+            snipEl.textContent = mail.resumen.trim();
+            item.appendChild(snipEl);
+          }
+
+          container.appendChild(item);
+        });
+
+        countBadge.textContent = list.length.toString();
+        if (unreadCount > 0) {
+          countBadge.classList.add("has-unread");
+        } else {
+          countBadge.classList.remove("has-unread");
+        }
+
+        return unreadCount;
+      }
+
+      function renderEmails(correos) {
+        const tareas = (correos && correos.tareas) || [];
+        const profesores = (correos && correos.profesores) || [];
+        const importantes = (correos && correos.importantes) || [];
+
+        const unreadTareas = renderEmailSection(dom.listTareas, dom.countTareas, tareas);
+        const unreadProfesores = renderEmailSection(dom.listProfesores, dom.countProfesores, profesores);
+        const unreadImportantes = renderEmailSection(dom.listImportantes, dom.countImportantes, importantes);
+
+        const totalUnread = unreadTareas + unreadProfesores + unreadImportantes;
+
+        // Si han llegado correos no leídos nuevos respecto a la anterior comprobación, la rana salta/croa
+        if (latestDashboardData !== null && totalUnread > previousUnreadEmailsCount) {
+          frog.triggerCroak();
+        }
+        previousUnreadEmailsCount = totalUnread;
+      }
+
+      function checkUpcomingEvent(eventsToday) {
+        const now = new Date();
+        let imminentEvent = null;
+
+        for (let i = 0; i < eventsToday.length; i++) {
+          const ev = eventsToday[i];
+          if (ev.todoElDia) continue;
+          const diffMinutes = (ev._start.getTime() - now.getTime()) / (1000 * 60);
+          if (diffMinutes > 0 && diffMinutes <= EVENT_ALERT_WINDOW_MINUTES) {
+            imminentEvent = ev;
+            break;
+          }
+        }
+
+        if (imminentEvent) {
+          if (upcomingEventAlertShown !== imminentEvent.titulo) {
+            upcomingEventAlertShown = imminentEvent.titulo;
+            frog.setAlertEvent(imminentEvent.titulo);
+          }
+        } else {
+          upcomingEventAlertShown = null;
+          if (frog.state === "ALERT") {
+            frog.clearAlertEvent();
+          }
+        }
+      }
+
+      function updateStatusSuccess(date) {
+        dom.statusDot.classList.remove("error");
+        dom.lastUpdatedText.textContent = "Actualizado a las " + formatTimeOnly(date);
+      }
+
+      function updateStatusWarning(message) {
+        dom.statusDot.classList.add("error");
+        dom.lastUpdatedText.textContent = message;
+      }
+
+      /* ==========================================================================
+         7. SINCRONIZACIÓN DE RED (FETCH A GOOGLE APPS SCRIPT)
+         ========================================================================== */
+      async function fetchDashboardData() {
+        if (isFetching) return;
+        const creds = getStoredCredentials();
+
+        if (!creds.api || !creds.token) {
+          showConfigModal();
+          updateStatusWarning("Requiere configuración");
+          return;
+        }
+
+        isFetching = true;
+        const targetUrl = creds.api + (creds.api.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(creds.token);
+
+        try {
+          const response = await fetch(targetUrl, {
+            method: "GET",
+            headers: {
+              "Accept": "application/json"
+            },
+            cache: "no-store"
+          });
+
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+
+          const data = await response.json();
+
+          if (data && data.error) {
+            throw new Error(data.error);
+          }
+
+          // Éxito: Pintamos los datos
+          latestDashboardData = data;
+          frog.setConnected(true);
+
+          renderEvents(data.eventos || []);
+          renderEmails(data.correos || {});
+
+          const updatedTime = data.actualizado ? new Date(data.actualizado) : new Date();
+          updateStatusSuccess(updatedTime);
+
+        } catch (err) {
+          console.warn("Fallo de sincronización:", err.message);
+          frog.setConnected(false); // La rana pone cara de confusión
+
+          // Mantener los últimos datos buenos en pantalla y mostrar aviso discreto
+          const lastTimeStr = latestDashboardData ? " (Manteniendo datos previos)" : "";
+          updateStatusWarning("Aviso: Red inestable" + lastTimeStr);
+        } finally {
+          isFetching = false;
+        }
+      }
+
+      // Intervalo de actualización cada 5 minutos
+      setInterval(fetchDashboardData, REFRESH_INTERVAL_MINUTES * 60 * 1000);
+
+      /* ==========================================================================
+         8. MASCOTA: RANA PIXEL ART 2D EN CANVAS NÍTIDO
+         ========================================================================== */
+      const frog = (function () {
+        const canvas = dom.frogCanvas;
+        const ctx = canvas.getContext("2d");
+        const bubble = dom.speechBubble;
+
+        // Paleta en armonía con el dashboard (24x24 pixels)
+        const C = {
+          _: null,               // Transparente
+          K: "#05090f",         // Borde oscuro
+          G1: "#10b981",        // Verde base (esmeralda suave)
+          G2: "#059669",        // Verde sombra
+          G3: "#34d399",        // Verde iluminado
+          W: "#f0fdf4",         // Blanco ojos
+          P: "#091322",         // Pupila
+          R: "#f43f5e",         // Colorete / boca
+          Y: "#f59e0b",         // Detalle / signo exclamación
+          Z: "#818cf8"          // Color Z nocturna
+        };
+
+        let state = "IDLE"; // IDLE, SLEEP, JUMP, CONFUSED, ALERT
+        let isConnected = true;
+        let alertMessage = "";
+        let jumpProgress = 0;
+        let breathFrame = 0;
+        let isBlinking = false;
+        let zAnimOffset = 0;
+
+        function isNightTime() {
+          const hour = new Date().getHours();
+          return hour >= SLEEP_START_HOUR || hour < SLEEP_END_HOUR;
+        }
+
+        // Matriz de Pixel Art (24x24) para la Rana
+        // 0: Vacío, 1: Borde, 2: Verde Base, 3: Verde Sombra, 4: Blanco Ojo, 5: Pupila, 6: Rosa Colorete, 7: Verde Claro
+        function drawPixelGrid(grid) {
+          ctx.clearRect(0, 0, 24, 24);
+          for (let y = 0; y < 24; y++) {
+            for (let x = 0; x < 24; x++) {
+              const colorKey = grid[y] ? grid[y][x] : null;
+              if (colorKey && C[colorKey]) {
+                ctx.fillStyle = C[colorKey];
+                ctx.fillRect(x, y, 1, 1);
+              }
+            }
+          }
+        }
+
+        // Generador de sprites según estado
+        function getSprite() {
+          const night = isNightTime();
+          const grid = [];
+          for (let i = 0; i < 24; i++) grid.push(new Array(24).fill("_"));
+
+          // Altura base (con leve respiración vertical)
+          const offsetY = (state === "IDLE" && Math.sin(breathFrame) > 0.6) ? -1 : 0;
+          const jumpY = (state === "JUMP") ? -Math.round(Math.sin(jumpProgress * Math.PI) * 5) : 0;
+          const yOff = offsetY + jumpY + 4; // Centrado hacia abajo
+
+          // Cuerpo redondeado de la rana
+          // Filas 7 a 17 (relativo a yOff)
+          function fillRect(x1, y1, w, h, col) {
+            for (let yy = y1; yy < y1 + h; yy++) {
+              for (let xx = x1; xx < x1 + w; xx++) {
+                if (yy + yOff >= 0 && yy + yOff < 24 && xx >= 0 && xx < 24) {
+                  grid[yy + yOff][xx] = col;
+                }
+              }
+            }
+          }
+
+          // Silueta del cuerpo
+          fillRect(6, 6, 12, 10, "G1");
+          fillRect(5, 8, 14, 7, "G1");
+          fillRect(4, 10, 16, 4, "G1");
+
+          // Sombra inferior
+          fillRect(5, 14, 14, 2, "G2");
+          fillRect(6, 15, 12, 1, "G2");
+
+          // Patas
+          fillRect(3, 14, 3, 3, "G2");
+          fillRect(18, 14, 3, 3, "G2");
+          fillRect(2, 16, 4, 1, "K");
+          fillRect(18, 16, 4, 1, "K");
+
+          // Ojos saltones
+          fillRect(5, 3, 4, 4, "G1");
+          fillRect(15, 3, 4, 4, "G1");
+
+          if (night || state === "SLEEP") {
+            // Ojos dormidos (- -)
+            fillRect(6, 5, 3, 1, "K");
+            fillRect(15, 5, 3, 1, "K");
+            // Letras 'z' flotando
+            const zY = Math.floor(Math.sin(zAnimOffset) * 2);
+            fillRect(19, 1 + zY, 2, 1, "Z");
+            fillRect(20, 2 + zY, 1, 1, "Z");
+            fillRect(19, 3 + zY, 2, 1, "Z");
+          } else if (state === "CONFUSED" || !isConnected) {
+            // Ojos en espiral / confundidos (x o desconcertados)
+            fillRect(6, 4, 3, 3, "W");
+            fillRect(15, 4, 3, 3, "W");
+            fillRect(7, 5, 1, 1, "Y"); // Ojo interrogante
+            fillRect(16, 4, 2, 1, "K"); // Ceja fruncida
+            fillRect(16, 6, 1, 1, "P");
+            // Signo de interrogación encima
+            fillRect(11, 0, 3, 1, "Y");
+            fillRect(13, 1, 1, 1, "Y");
+            fillRect(12, 2, 1, 1, "Y");
+            fillRect(12, 4, 1, 1, "Y");
+          } else if (isBlinking) {
+            // Ojos cerrados por parpadeo
+            fillRect(5, 5, 4, 1, "K");
+            fillRect(15, 5, 4, 1, "K");
+          } else {
+            // Ojos normales abiertos
+            fillRect(5, 4, 4, 3, "W");
+            fillRect(15, 4, 4, 3, "W");
+            fillRect(7, 5, 2, 2, "P");
+            fillRect(15, 5, 2, 2, "P");
+            fillRect(6, 4, 1, 1, "W"); // Brillo
+            fillRect(16, 4, 1, 1, "W");
+          }
+
+          // Coloretes en las mejillas
+          fillRect(5, 11, 2, 1, "R");
+          fillRect(17, 11, 2, 1, "R");
+
+          // Boca
+          if (state === "JUMP") {
+            // Boca abierta croando en salto
+            fillRect(10, 11, 4, 3, "R");
+            fillRect(11, 12, 2, 1, "K");
+          } else if (state === "CONFUSED" || !isConnected) {
+            // Boca ondulada / duda
+            fillRect(10, 12, 2, 1, "K");
+            fillRect(12, 11, 2, 1, "K");
+          } else {
+            // Sonrisa calmada
+            fillRect(9, 12, 6, 1, "K");
+          }
+
+          // Contorno exterior sutil
+          fillRect(5, 2, 4, 1, "K");
+          fillRect(15, 2, 4, 1, "K");
+          fillRect(4, 3, 1, 4, "K");
+          fillRect(19, 3, 1, 4, "K");
+          fillRect(9, 6, 6, 1, "G3"); // Brillo cabeza
+
+          return grid;
+        }
+
+        function showSpeech(text, duration) {
+          bubble.textContent = text;
+          bubble.classList.add("visible");
+          if (duration) {
+            setTimeout(function () {
+              bubble.classList.remove("visible");
+            }, duration);
+          }
+        }
+
+        function hideSpeech() {
+          bubble.classList.remove("visible");
+        }
+
+        // Loop de animación a 30 FPS suficiente y ligero para iPad 2019
+        let lastFrameTime = 0;
+        function animateLoop(timestamp) {
+          if (timestamp - lastFrameTime > 66) { // ~15-20 FPS es ideal para pixel art nostálgico y ahorra batería
+            lastFrameTime = timestamp;
+
+            breathFrame += 0.08;
+            zAnimOffset += 0.06;
+
+            // Parpadeo aleatorio si está despierta
+            if (state === "IDLE" && !isNightTime() && isConnected) {
+              if (!isBlinking && Math.random() < 0.015) {
+                isBlinking = true;
+                setTimeout(function () { isBlinking = false; }, 180);
+              }
+            }
+
+            // Animación de salto
+            if (state === "JUMP") {
+              jumpProgress += 0.12;
+              if (jumpProgress >= 1) {
+                jumpProgress = 0;
+                state = "IDLE";
+                setTimeout(hideSpeech, 2500);
+              }
+            }
+
+            drawPixelGrid(getSprite());
+          }
+          requestAnimationFrame(animateLoop);
+        }
+        requestAnimationFrame(animateLoop);
+
+        return {
+          triggerCroak: function () {
+            state = "JUMP";
+            jumpProgress = 0;
+            showSpeech("¡Croac! ¡Nuevo correo!", 3500);
+          },
+          setAlertEvent: function (title) {
+            state = "ALERT";
+            showSpeech("⏰ ¡En breve!: " + title);
+          },
+          clearAlertEvent: function () {
+            state = "IDLE";
+            hideSpeech();
+          },
+          setConnected: function (connected) {
+            isConnected = connected;
+            if (!connected) {
+              state = "CONFUSED";
+              showSpeech("¿Sin conexión?", 4000);
+            } else if (state === "CONFUSED") {
+              state = "IDLE";
+              hideSpeech();
+            }
+          },
+          get state() {
+            return state;
+          }
+        };
+      })();
+
+      /* ==========================================================================
+         9. INICIALIZACIÓN
+         ========================================================================== */
+      const initialCreds = getStoredCredentials();
+      if (!initialCreds.api || !initialCreds.token) {
+        // Primera vez: abrir modal de credenciales
+        setTimeout(showConfigModal, 600);
+      } else {
+        fetchDashboardData();
+      }
+
+    })();
+  </script>
+</body>
+</html>
