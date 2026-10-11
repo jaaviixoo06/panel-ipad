@@ -642,8 +642,13 @@
     /* Tablet en vertical y pantallas estrechas: una columna.
        La página no se mueve; el scroll lo hace el contenedor central (fiable al girar en iOS). */
     @media (orientation: portrait), (max-width: 820px) {
+      #app-container { grid-template-columns: minmax(0, 1fr); }
+    }
+
+    /* Modo "scroll": cuando no cabe todo (vertical, estrecho o móvil tumbado con poca altura),
+       las tarjetas toman su altura natural y se desliza la zona central entera. */
+    @media (orientation: portrait), (max-width: 820px), (max-height: 500px) {
       #app-container {
-        grid-template-columns: minmax(0, 1fr);
         grid-template-rows: none;
         grid-auto-rows: max-content;
         align-content: start;
@@ -1551,11 +1556,6 @@
       } else {
         fetchDashboardData();
       }
-
-    })();
-  </script>
-</body>
-</html>
 
     })();
   </script>
