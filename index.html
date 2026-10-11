@@ -413,7 +413,7 @@
       justify-content: space-between;
       align-items: center;
       margin-top: 14px;
-      padding: 4px 110px 0 8px; /* hueco a la derecha para que la rana no tape "Ajustes" */
+      padding: 4px 190px 0 8px; /* hueco a la derecha para que el árbol y la rana no tapen "Ajustes" */
       font-size: 0.88rem;
       color: var(--text-muted);
       position: relative;
@@ -510,7 +510,31 @@
       border-top: 6px solid #ffffff;
     }
 
-    #frog-canvas {
+    .frog-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 6px;
+    }
+
+    /* El árbol sí recibe toques (para recoger la manzana) */
+    #tree-canvas {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .footer-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #streak-badge {
+      font-weight: 700;
+      color: var(--text-main);
+      white-space: nowrap;
+    }
+
+    #frog-canvas, #tree-canvas {
       width: 72px;
       height: 72px;
       image-rendering: -moz-crisp-edges;
@@ -673,7 +697,8 @@
       .event-header-row { flex-direction: column; align-items: flex-start; gap: 4px; }
       .event-title { white-space: normal; font-size: 1.05rem; }
       .frog-dock { right: 10px; bottom: 8px; }
-      #frog-canvas { width: 56px; height: 56px; }
+      #frog-canvas, #tree-canvas { width: 56px; height: 56px; }
+      #dashboard-footer { padding-right: 130px; flex-wrap: wrap; gap: 6px; }
       .modal-actions { flex-direction: column-reverse; }
       .modal-actions .btn { width: 100%; }
     }
@@ -786,7 +811,8 @@
       <div id="status-indicator" class="pulse-dot"></div>
       <span id="last-updated-text">Iniciando conexión...</span>
     </div>
-    <div>
+    <div class="footer-right">
+      <span id="streak-badge"></span>
       <button class="btn-settings" id="btn-open-settings">Ajustes</button>
     </div>
   </footer>
@@ -794,7 +820,10 @@
   <!-- DOCK DE LA MASCOTA (RANA PIXEL ART) -->
   <div class="frog-dock">
     <div id="frog-speech-bubble">¡Hola!</div>
-    <canvas id="frog-canvas" width="24" height="24"></canvas>
+    <div class="frog-row">
+      <canvas id="tree-canvas" width="24" height="24"></canvas>
+      <canvas id="frog-canvas" width="24" height="24"></canvas>
+    </div>
   </div>
 
   <!-- MODAL DE CONFIGURACIÓN (API Y TOKEN) -->
@@ -834,6 +863,8 @@
       const SLEEP_START_HOUR = 23;              // 23:00 - Comienza a dormir la rana
       const SLEEP_END_HOUR = 7;                 // 07:00 - Se despierta la rana
       const EVENT_ALERT_WINDOW_MINUTES = 15;     // Aviso de evento inminente (bocadillo)
+      const TREE_CYCLE_HOURS = 24;              // Horas que tarda el árbol en crecer y soltar la manzana
+      const STREAK_GRACE_HOURS = 24;            // Horas que aguanta la manzana en el suelo antes de perder la racha
       
       const STORAGE_KEY_API = "ipad_dashboard_api_url";
       const STORAGE_KEY_TOKEN = "ipad_dashboard_api_token";
@@ -1540,10 +1571,183 @@
               hideSpeech();
             }
           },
+          say: function (text, duration) {
+            showSpeech(text, duration || 3500);
+          },
+          eat: function (text) {
+            state = "JUMP";
+            jumpProgress = 0;
+            showSpeech(text, 4500);
+          },
           get state() {
             return state;
           }
         };
+      })();
+
+      /* ==========================================================================
+         8b. ÁRBOL, MANZANA Y RACHA
+         El árbol crece durante TREE_CYCLE_HOURS desde la última vez que la rana comió.
+         Al completar el ciclo la manzana cae al suelo: tócala para dársela a la rana.
+         Si pasan más de STREAK_GRACE_HOURS con la manzana en el suelo, la racha se pierde.
+         ========================================================================== */
+      (function () {
+        const canvas = document.getElementById("tree-canvas");
+        const ctx = canvas.getContext("2d");
+        const badge = document.getElementById("streak-badge");
+
+        const CYCLE_MS = TREE_CYCLE_HOURS * 3600000;
+        const GRACE_MS = STREAK_GRACE_HOURS * 3600000;
+        const KEY_FED = "ipad_dashboard_tree_last_fed";
+        const KEY_STREAK = "ipad_dashboard_streak";
+        const KEY_BEST = "ipad_dashboard_streak_best";
+
+        const COL = {
+          grass: "#059669", soil: "#1a253a",
+          trunk: "#8b5a2b", trunkDark: "#6b4423",
+          leaf: "#10b981", leafLight: "#34d399", leafDark: "#059669",
+          flower: "#fbcfe8", unripe: "#a3e635",
+          apple: "#f43f5e", appleLight: "#fda4af"
+        };
+
+        function readNum(key) {
+          try {
+            const v = parseInt(localStorage.getItem(key), 10);
+            return isNaN(v) ? 0 : v;
+          } catch (e) { return 0; }
+        }
+        function writeNum(key, value) {
+          try { localStorage.setItem(key, String(value)); } catch (e) {}
+        }
+
+        let lastFed = readNum(KEY_FED);
+        let streak = readNum(KEY_STREAK);
+        let best = readNum(KEY_BEST);
+        // Primera vez: la manzana ya está lista para poder probarlo
+        if (!lastFed) lastFed = Date.now() - CYCLE_MS;
+
+        function progress() {
+          return (Date.now() - lastFed) / CYCLE_MS;
+        }
+
+        function px(x, y, w, h, color) {
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, w, h);
+        }
+
+        function drawAdultTree() {
+          px(11, 13, 3, 9, COL.trunk);
+          px(13, 13, 1, 9, COL.trunkDark);
+          px(10, 21, 5, 1, COL.trunkDark);
+          px(5, 4, 14, 9, COL.leaf);
+          px(3, 6, 18, 5, COL.leaf);
+          px(6, 3, 12, 1, COL.leafLight);
+          px(5, 13, 14, 1, COL.leafDark);
+          px(7, 5, 4, 1, COL.leafLight);
+          px(5, 7, 2, 1, COL.leafLight);
+        }
+
+        function draw() {
+          const p = progress();
+          ctx.clearRect(0, 0, 24, 24);
+
+          // Suelo
+          px(2, 22, 20, 1, COL.grass);
+          px(3, 23, 18, 1, COL.soil);
+
+          if (p < 0.12) {
+            // Brote
+            px(12, 20, 1, 2, COL.leafDark);
+            px(11, 19, 1, 1, COL.leafLight);
+            px(13, 19, 1, 1, COL.leafLight);
+          } else if (p < 0.35) {
+            // Arbolito
+            px(12, 16, 1, 6, COL.trunk);
+            px(10, 12, 5, 4, COL.leaf);
+            px(11, 11, 3, 1, COL.leafLight);
+            px(10, 15, 5, 1, COL.leafDark);
+          } else if (p < 0.6) {
+            // Árbol joven
+            px(11, 14, 2, 8, COL.trunk);
+            px(12, 14, 1, 8, COL.trunkDark);
+            px(7, 7, 10, 7, COL.leaf);
+            px(6, 9, 12, 3, COL.leaf);
+            px(8, 6, 8, 1, COL.leafLight);
+            px(7, 13, 10, 1, COL.leafDark);
+            px(9, 8, 3, 1, COL.leafLight);
+          } else {
+            drawAdultTree();
+
+            if (p >= 0.7 && p < 0.85) {
+              // Flores
+              px(6, 7, 1, 1, COL.flower);
+              px(10, 5, 1, 1, COL.flower);
+              px(15, 6, 1, 1, COL.flower);
+              px(17, 9, 1, 1, COL.flower);
+              px(8, 10, 1, 1, COL.flower);
+              px(13, 9, 1, 1, COL.flower);
+            } else if (p >= 0.85 && p < 1) {
+              // Manzana en la rama: verde primero, roja al final
+              px(15, 7, 1, 1, COL.trunkDark);
+              px(14, 8, 2, 2, p < 0.93 ? COL.unripe : COL.apple);
+            } else if (p >= 1) {
+              // Manzana caída: da saltitos para indicar que se puede tocar
+              const bob = (Math.floor(Date.now() / 500) % 2) ? -1 : 0;
+              px(19, 19 + bob, 1, 1, COL.trunkDark);
+              px(18, 20 + bob, 2, 2, COL.apple);
+              px(18, 20 + bob, 1, 1, COL.appleLight);
+            }
+          }
+        }
+
+        function daysText(n) {
+          return n + (n === 1 ? " día" : " días");
+        }
+
+        function updateBadge() {
+          badge.textContent = "🍎 Racha: " + daysText(streak);
+        }
+
+        function formatRemaining(ms) {
+          const totalMin = Math.max(1, Math.ceil(ms / 60000));
+          const h = Math.floor(totalMin / 60);
+          const m = totalMin % 60;
+          return h > 0 ? h + " h " + m + " min" : m + " min";
+        }
+
+        function onTap() {
+          const p = progress();
+          if (p >= 1) {
+            streak += 1;
+            const isRecord = streak > best && streak > 1;
+            if (streak > best) best = streak;
+            lastFed = Date.now();
+            writeNum(KEY_FED, lastFed);
+            writeNum(KEY_STREAK, streak);
+            writeNum(KEY_BEST, best);
+            updateBadge();
+            draw();
+            frog.eat("¡Ñam! Racha: " + daysText(streak) + (isRecord ? " (¡récord!)" : ""));
+          } else {
+            frog.say("La manzana caerá en " + formatRemaining((1 - p) * CYCLE_MS), 3500);
+          }
+        }
+        canvas.addEventListener("click", onTap);
+
+        function tick() {
+          // Racha perdida: la manzana lleva demasiado tiempo en el suelo
+          if (streak > 0 && Date.now() - lastFed > CYCLE_MS + GRACE_MS) {
+            streak = 0;
+            writeNum(KEY_STREAK, 0);
+            updateBadge();
+            frog.say("Se perdió la racha... ¡hoy empezamos otra!", 6000);
+          }
+          draw();
+        }
+
+        updateBadge();
+        tick();
+        setInterval(tick, 500);
       })();
 
       /* ==========================================================================
